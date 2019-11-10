@@ -36,18 +36,20 @@ library(data.table)
 
 ```{r}
 
-# Importing and cleaning HIV data
+# NOTE: For some reason, three columns from the HIV data set are stored as characters or factors, rather than numerical values, which means I can't perform calculations on them or sort them in order properly. I can easily transform them into numerical columns, but for reasons I don't understand, doing so alters all the values in the column and makes them wildly innaccurate. This is something I'll have to figure out with Sean. Until I do, I can't run certain chunks of code. So for now, I'll write them in comments; once Sean and I figure out a fix, it will only take me about five minutes to go back, run what I have written and get results.
+
+```
+
+```{r}
+
+# Q1: How can I fix the problem of correctly loading the population and FIPS columns?
+
+# A: Import the HIV data in two separate ways, then join them together.
 
 # Reading data
 
 hiv.data.1 <- read_csv("data/HIV_DATA.csv")
                      
-```
-
-```{r}
-
-# Reading data again
-
 hiv.data.2 <- read.csv("data/HIV_DATA.csv")
 
 ```
@@ -63,19 +65,19 @@ hiv.data.1 <- hiv.data.1 %>%
 hiv.data.2 <- hiv.data.2 %>%
   filter(Cases != "Data suppressed")
 
+```
 
+```{r}
 
 # Removing unecessary columns from each dataframe to simplify the join
 
 hiv.data.1 <- 
-  select(hiv.data.1,-c(Geography, Indicator, Population))
+ select(hiv.data.1,-c(Geography, Indicator, Population))
 
 hiv.data.2 <- 
-  select(hiv.data.2, -c(Geography, Indicator, FIPS, Cases, Rate.per.100000))
-
-
+ select(hiv.data.2, -c(Geography, FIPS, ï..Indicator, Cases, Rate.per.100000))
+ 
 ```
-
 
 ```{r}
 
@@ -93,6 +95,12 @@ hiv.data <- clean_names(hiv.data)
 
 ```{r}
 
+glimpse(hiv.data)
+
+```
+
+```{r}
+
 # Renaming columns to make the dataframe easier to read
 
  hiv.data <- hiv.data %>% 
@@ -104,7 +112,7 @@ hiv.data <- clean_names(hiv.data)
 
 ```{r}
 
-# Q1: How many counties had "data suppressed" as their value?
+# Q2: How many counties had "data suppressed" as their value?
 
 hiv.data.raw <- read.csv("data/HIV_DATA.csv")
 
@@ -117,30 +125,38 @@ hiv.data.raw %>%
 
 ```{r}
 
-# Q2: Which county had the highest rate of HIV diagnoses? When?
+# Q3: Which county had the highest rate of HIV diagnoses? When?
 
 hiv.data %>%
   arrange(desc(hiv_rate_per_100k))
 
-# A: Calhoun County, GA, in 2008. 
+# A: Will be filled out once column type issue is fixed.
+
+```
+
+```{r}
+
+# Q: Which county had the highest raw number of HIV cases? When? 
+
+hiv.data %>%
+  arrange(desc(hiv_cases))
+
+# A: Will be filled out once column type issue is fixed.
 
 ```
 
 ``` {r}
 
-# Q3: How many counties have a rate of 0?
+# Q5: How many counties have a rate of 0?
 
 hiv.data %>%
   filter(hiv_cases=="0")
 
 # A: 1,161.
 
-
 ```
 
 ```{r}
-
-# Loading in ARCOS opioid data
 
 # Storing one of our API keys as an object called key
 
@@ -155,7 +171,7 @@ arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
 
 ``` {r}
 
-# The ARCOS database only covers the years 2006-2012. I'm going to remove the years that don't match up from the HIV data. For some reason it isn't working when I list the years I want to remove, so I guess I'll just do it four times.
+# The ARCOS database only covers the years 2006-2012. I'm going to remove the years that don't match up from the HIV data. For some reason it isn't working when I list multiple years I want to remove, so I guess I'll just do it four times.
 
 hiv.data <- hiv.data %>%
   filter(year != 2016)
@@ -185,14 +201,7 @@ arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
 # Changing names in ARCOS dataframe to match HIV dataframe
 
 arcos_county_pills_per_year <- arcos_county_pills_per_year %>% 
-  #setnames(old=c("buyer_state"), new=c("state"))
-  setnames(old=c("buyer_county"), new=c("county"))
-
-
-# Removing FIPS from ARCOS dataframe
-
-  arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
-  subset(select = -c(countyfips))
+  setnames(old=c("countyfips"), new=c("fips"))
 
 
 ```
@@ -201,131 +210,139 @@ arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
 
 # Joining HIV data with ARCOS data
 
-hiv_and_pills <- merge(hiv.data, arcos_county_pills_per_year, by=c("year","county", "state")) 
+hiv_and_pills <- hiv.data %>%
+  inner_join(arcos_county_pills_per_year, by=c("fips","year"))
 
 ```
 
-
 ```{r}
 
-# Q5: How many counties do we have data for once we do the join? 
+# Q6: How many counties do we have data for once we do the join? 
  
-# A: 11,344. That's less than half of what we started with. Seems problematic. Maybe I will have to     focus on one state? Or a handful of states?
-
-# Now I want to figure out how to get rid of the unnecessary columns. 
-
-hiv_and_pills <- hiv_and_pills %>%
-  subset(select = -c(year.x,buyer_state))
+# A: 11,029. That's less than half of what we started with. Seems problematic. Maybe I will have to     focus on one state? Or a handful of states?
 
 ```
 
 ```{r}
 
+# Q7: Now I want to figure out how to get rid of the unnecessary columns and arrange them nicely. How do I do that?
+
+# A: This is how.
+
+# Removing columns
+
 hiv_and_pills <- hiv_and_pills %>%
-  subset(select = -c(buyer_county))
+  subset(select = -c(buyer_county,buyer_state))
 
-```
-
-```{r}
-#
-#Now I want to clean up the column names and rearrange their order. 
+# Cleaning up  column names and rearranging their order. 
 
 hiv_and_pills %>%
-  #setnames(old=c("rate_per_100000"), new=c("hiv_rate")) 
-  #setnames(old=c("year.y"), new=c("year")) 
-  #setnames(old=c("count"), new=c("shipments")) 
-  #setnames(old=c("cases"), new=c("hiv_cases")) 
+  setnames(old=c("count"), new=c("shipments")) 
+
+hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "shipments", "dosage_unit", "hiv_cases", "hiv_rate_per_100k", "population")]
 
 ```
 
 ```{r}
 
-hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "shipments", "dosage_unit", "hiv_cases", "hiv_rate", "population")]
+# Q8: Which county received the most pills during this timeframe? How many? What year was it?
+
+# A: Los Angeles County in 2011. It received 232,616,611 pills that year.
 
 ```
 
 ```{r}
 
-# Make a column for pills per person.
+# Make a column for pills per person. (Can't run until column type issue is fixed)
 
-
-#hiv_and_pills <- hiv_and_pills %>% 
-   #mutate(population = as.(population))
-
-#glimpse(hiv_and_pills)
-
-
-#hiv_and_pills <- hiv_and_pills %>%
- #mutate(pills_per_person=dosage_unit/population)
-
-
+# hiv_and_pills <- hiv_and_pills %>%
+ # mutate(pills_per_person=dosage_unit/population)
 
 ```
 
 ```{r}
 
-#Q6: Which county had the most pills per person during this time?
+# Q9: Which county had the most pills per person during this time?
 
 hiv_and_pills %>%
   arrange(desc(pills_per_person))
 
-# A: According to that code, it was Oakland County, MI. However, I do not trust this, because its population is listed as 4. How could a county with 4 people have 1,398 cases of HIV in 2012? There is clearly a problem here. I do not know what it is.
-
-
-```
-
-```{r}
-
-#Q7: What the hell is wrong with the population column? In the original HIV dataset, Oakland County had a population of more than 1,000,000. Now, it says it has a population of 4. Something clearly went wrong with the join. 
-
-hiv.data %>%
-  arrange(desc(population))
-
-# OKAY so it might be because the population was listed as a "factor" column in the OG dataset. Let me go back and fix that and try everything again. 
-
-# UPDATE: This mutation of the population and dosage_units column is clearly breaking everything. It has something to do with the way the population column is formatted. I've been on stackoverflow and other sites for close to an hour, and can't figure out why it's messing everything up. That will have to wait until later. (I went back and commented that last chunk out.)
-
-# What I did figure out, though, is that the join is messed up because the CSV axed off any "0"s that led off a FIPS code. I'm going to try and fix that.
-
-# UPDATE (about an hour after the last update): After an absolutely hellish process, I have come to the conclusion that I will need Sean's help to figure out this issue with the FIPS code. For now, I'll analyze all the results I am able to get with the join.
+# A: Will be filled out once column type issue is fixed.
 
 ```
 
 ```{r}
 
-# Q8: Which county had the highest rate of HIV diagnoses in 2012?
+#Q10: Is there pattern when this data is grouped by state in the year 2012 and filtered for counties that received a decent amount of pills?
 
-hiv_and_pills %>%
+hiv_and_pills_2012 <- hiv_and_pills %>%
   filter(year=="2012") %>%
-  arrange(desc(hiv_rate))
+  filter(dosage_unit >= "500000")
 
-# A: Calhoun County, GA.
-
-```
-
-```{r}
-
-#Q9: Is there any HIV rate pattern when this data is grouped by state in the year 2012?
-
-hiv_and_pills %>%
-  filter(year=="2012") %>%
-  group_by(state) 
-
-# A: It's hard to tell, and this clearly isn't perfect code for the job. I'm going to try a different approach.
+# A: Will be filled out once column type issue is fixed.
 
 ```
 
 ```{r}
 
-# Q10: I'm going to zero in on some specific states. What was up with Florida in 2012?
+# Q11: I'm going to zero in on some specific states. What was up with West Virginia in 2012?
 
-hiv_and_pills %>%
-  filter(year=="2012", state=="FL") %>%
-  arrange(desc(hiv_rate))
+wv_2012_hiv_and_pills <- hiv_and_pills %>%
+  filter(state=="WV", year=="2012") 
 
+# Q12: Which county in West Virginia got the most pills in this year?
 
-# A: Something is wrong with these columns, yet again. Looks like they are factors, which means they can't be properly sorted in a numeric way. But every time I try to fix that, the numbers get clearly skewed.
+# A: Kanawha County. It got 15,621,740 pills.
 
 ```
 
+```{r}
 
+# The more I look at and think about this data, the more I think I'd want to compare pill shipments from 2006-2012 with HIV data from 2016 (or the most recent I can get). That could be more valuable because, if there is a link between the severity of the opioid crisis on the county level and that county's HIV rate, it probably would have taken some time to develop. Per the Post article Sean sent me, the CDC released a report in 2016 that identified 220 counties across the nation that were at risk for HIV because of intravenous drug use. The most at-risk county was Wolfe County, Kentucky. That county's HIV data wasn't available from the CDC. McDowell County, West Virginia, ranked second. I'm going to zero in on it.
+
+# Q13: Does anything obvious jump out when looking at McDowell's HIV rate and pill shipments from 2008-2012?
+
+mcdowell <- hiv_and_pills %>%
+  filter(county=="Mcdowell County", state=="WV")
+
+
+# A: The number of pill shipments did jump pretty dramatically from 2009-12, as did the HIV rate per 100,000. However, with such a small sample size, it's hard to tell how valuable those numbers are.
+
+```
+
+```{r}
+
+# Q14: What does a county-by-county map of the HIV rate in 2012 look like? (Not sure if the color-coding is valuable given the issue with the column type. It's certainly messing up the legend. It's useful, though, to get a sense of what areas of the country I have data for, and what areas I don't.)
+
+census_key <- census_api_key("549950d36c22ff16455fe196bbbd01d63cfbe6cf")
+
+county_geodata_shifted <- get_acs(geography = "county",
+              variables = "B01001_001", geometry = TRUE, shift_geo = TRUE)
+
+hiv.data.2012 <- hiv.data %>%
+  filter(year=="2012")
+
+geo_hiv_county_2012 <- county_geodata_shifted %>%
+ inner_join(hiv.data.2012, by=c("GEOID" = "fips"))
+
+mapview(geo_hiv_county_2012, zcol = "hiv_rate_per_100k", legend = TRUE)
+
+```
+
+```{r}
+
+# Q15: Once the column type issue is fixed, this code will create a scatter plot with a trendline that shows West Virginia counties' pill shipments and HIV cases per 100,000 in the year 2012.
+
+
+options(scipen=999)
+
+ggplot(wv_2012_hiv_and_pills) +
+  geom_point(aes(hiv_rate_per_100k, pills_per_person)) + 
+  labs(x="HIV rate per 100,000", y="Opioid pills per capita", title="Title Here", caption = "Source: DEA ARCOS database, via Washington Post") +
+  scale_x_continuous(labels = comma) +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_smooth(aes(estimate, pills_per_person), method = "lm", se = FALSE) +
+  geom_text_repel(aes(estimate, pills_per_person, label=buyer_county.x), 
+    subset(wv_2012_hiv_and_pills, pills_per_person > 40))
+
+```
