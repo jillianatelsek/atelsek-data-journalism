@@ -264,8 +264,8 @@ hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "shipments",
 
 # Q9: Which county had the most pills per person during this time?
 
-hiv_and_pills %>%
-  arrange(desc(pills_per_person))
+# hiv_and_pills %>%
+ # arrange(desc(pills_per_person))
 
 # A: Will be filled out once column type issue is fixed.
 
@@ -334,15 +334,15 @@ mapview(geo_hiv_county_2012, zcol = "hiv_rate_per_100k", legend = TRUE)
 # Q15: Once the column type issue is fixed, this code will create a scatter plot with a trendline that shows West Virginia counties' pill shipments and HIV cases per 100,000 in the year 2012.
 
 
-options(scipen=999)
+#options(scipen=999)
 
-ggplot(wv_2012_hiv_and_pills) +
-  geom_point(aes(hiv_rate_per_100k, pills_per_person)) + 
-  labs(x="HIV rate per 100,000", y="Opioid pills per capita", title="Title Here", caption = "Source: DEA ARCOS database, via Washington Post") +
-  scale_x_continuous(labels = comma) +  
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_smooth(aes(estimate, pills_per_person), method = "lm", se = FALSE) +
-  geom_text_repel(aes(estimate, pills_per_person, label=buyer_county.x), 
-    subset(wv_2012_hiv_and_pills, pills_per_person > 40))
+#ggplot(wv_2012_hiv_and_pills) +
+#geom_point(aes(hiv_rate_per_100k, pills_per_person)) + 
+  #labs(x="HIV rate per 100,000", y="Opioid pills per capita", title="Title Here", caption = "Source: DEA ARCOS database, via Washington Post") +
+  #scale_x_continuous(labels = comma) +  
+  #theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+ # geom_smooth(aes(estimate, pills_per_person), method = "lm", se = FALSE) +
+  #geom_text_repel(aes(estimate, pills_per_person, label=buyer_county.x), 
+   # subset(wv_2012_hiv_and_pills, pills_per_person > 40))
 
 ```
