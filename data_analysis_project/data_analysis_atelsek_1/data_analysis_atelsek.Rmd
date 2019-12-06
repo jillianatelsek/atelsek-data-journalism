@@ -13,19 +13,27 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```
 
+
+new csv for 220 counties
+compare pills per person to nation; compare overdose deaths to nation
+
+in these 220 counties, rate of pills sent there per person was dramatically higher 
+
+
+
 ```{r}
 
 #Installing packages
 
-#install.packages("data.table")
-#install.packages("tidyverse")
-#install.packages("janitor")
-#install.packages("arcos")
-#install.packages("tidycensus")
-#install.packages("mapview")
-#install.packages("ggthemes")
-#install.packages("scales")
-#install.packages("corrr")
+install.packages("data.table")
+install.packages("tidyverse")
+install.packages("janitor")
+install.packages("arcos")
+install.packages("tidycensus")
+install.packages("mapview")
+install.packages("ggthemes")
+install.packages("scales")
+install.packages("corrr")
 
 
 # Loading packages
@@ -73,10 +81,10 @@ hiv.data.2 <- hiv.data.2 %>%
 # Removing unecessary columns from each dataframe to simplify the join
 
 hiv.data.1 <- 
- select(hiv.data.1,-c(Geography, Indicator, Population))
+select(hiv.data.1,-c(Geography, Indicator, Population))
 
 hiv.data.2 <- 
- select(hiv.data.2, -c(Geography, FIPS, ï..Indicator, Cases, Rate.per.100000))
+ select(hiv.data.2, -c(Geography, FIPS, Indicator, Cases, Rate.per.100000))
  
 ```
 
@@ -84,19 +92,19 @@ hiv.data.2 <-
 
 # Merging hiv.data.1 (which has accurate FIPS code information) and hiv.data.2 (which has accurate population information)
 
-hiv.data <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
+hiv.data.working <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
 
 # SUCCESS 
 
 # Making column names lowercase
 
-hiv.data <- clean_names(hiv.data)
+hiv.data.working <- clean_names(hiv.data.working)
 
 ```
 
 ```{r}
 
- hiv.data. <- hiv.data %>% 
+ hiv.data.working <- hiv.data.working %>% 
   setnames(old=c("rate_per_100000"), new=c("hiv_rate_per_100k")) %>%
   setnames(old=c("cases"), new=c("hiv_cases")) 
 
@@ -104,7 +112,7 @@ hiv.data <- clean_names(hiv.data)
 
 ```{r}
 
-hiv.data.working <- hiv.data %>%
+hiv.data.working <- hiv.data.working %>%
   mutate(hiv_cases=as.numeric(str_remove(hiv_cases,","))) %>%
   mutate(hiv_rate_per_100k=as.numeric(hiv_rate_per_100k)) %>%
   mutate(population=as.numeric(str_remove_all(population,",")))
@@ -443,10 +451,10 @@ mcdowell <- hiv_and_pills %>%
 
 ```{r}
 
-# I am going to make a table for just the states that had counties identified as     at-risk. 
+# I am going to make a table for just the states that had counties identified as at-risk. 
 
   at_risk_counties <- hiv_and_pills %>%
-    filter(state ==c("AL","AK", "AZ", "CA", "CO", "GA", "IL", "IN", "KY", "MN", "MI", "MO", "MT", "NV", "NC", "OH", "OK", "PA", "TX", "UT", "VT", "WV", "KS", "SC", "VA", "TN"))
+    filter(state %in% c("AL","AK", "AZ", "CA", "CO", "GA", "IL", "IN", "KY", "MN", "MI", "MO", "MT", "NV", "NC", "OH", "OK", "PA", "TX", "UT", "VT", "WV", "KS", "SC", "VA", "TN"))
   
 # Q25: Any correlation there?
 
@@ -454,31 +462,42 @@ mcdowell <- hiv_and_pills %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
   
-# Q26: What if I compare pills in 2008 to opioid rate in 2012?
+  
+```
+  
+```{r}
+# Q26: What if I compare pills in 2008 to HIV rate in 2012?
   
   ar_pills_2008 <- at_risk_counties %>%
   filter(year=="2008") %>%
   select(pills_per_person, fips, state)
 
-  ar_hiv_2016 <- at_risk_counties %>%
-  filter(year == "2016") %>%
+  ar_hiv_2012 <- at_risk_counties %>%
+  filter(year == "2012") %>%
   select(hiv_rate_per_100k, fips, state)
 
-  ar_change <- ar_pills_2008 %>%
-  inner_join(ar_hiv_2016, by=c("fips", "state")) %>%
-  select(hiv_rate_per_100k, pills_per_person)
-  #correlate()
-  
+  ar_pills_2008 %>%
+  inner_join(ar_hiv_2012, by=c("fips", "state")) %>%
+  filter(state %in% c("KY", "TN")) %>%
+  select(hiv_rate_per_100k, pills_per_person) %>%
+  correlate()
+
 # A: Getting an error with the correlate function here that I can't seem to fix. Going to address it in class.
   
 
 # Q27: Kentucky and Tennessee had the most counties on the vulnerability list. Any correlation in just those two states?
   
   
- ar_change %>%
-  filter(state == c("KY", "TN")) %>%
-  select(hiv_rate_per_100k, pills_per_person) %>%
-  correlate()
+ 
+#  ar_pills_2008 %>%
+#  inner_join(ar_hiv_2016, by=c("fips", "state")) %>%
+#  filter(state==c("KY", "TN")) %>% 
+ # select(hiv_rate_per_100k, pills_per_person) %>%
+ # correlate()
+
+  
+hiv.data.working  
+  
 
  # A: Same as above.  
 
