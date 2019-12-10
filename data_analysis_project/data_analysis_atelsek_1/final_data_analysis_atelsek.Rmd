@@ -7,22 +7,327 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+```{r}
+#Installing packages
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+#install.packages("data.table")
+#install.packages("tidyverse")
+#install.packages("janitor")
+#install.packages("arcos")
+#install.packages("tidycensus")
+#install.packages("mapview")
+#install.packages("ggthemes")
+#install.packages("scales")
+#install.packages("corrr")
 ```
 
-## Including Plots
+```{r}
 
-You can also embed plots, for example:
+# Loading packages
+library(tidyverse)
+library(janitor)
+library(arcos)
+library(tidycensus)
+library(mapview)
+library(ggthemes)
+library(scales)
+library(data.table)
+library(corrr)
+library(dplyr)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+#PART 1: Reading and cleaning data
+
+```{r}
+
+# Reading HIV data
+
+hiv.data.1 <- read_csv("data/HIV_DATA.csv")
+                     
+hiv.data.2 <- read.csv("data/HIV_DATA.csv")
+
+```
+
+```{r}
+
+# Removing all counties for which HIV data was suppressed
+
+hiv.data.1 <- hiv.data.1 %>%
+  filter(Cases != "Data suppressed")
+hiv.data.2 <- hiv.data.2 %>%
+  filter(Cases != "Data suppressed")
+
+```
+
+```{r}
+
+# Removing unecessary columns from each dataframe
+
+hiv.data.1 <- 
+select(hiv.data.1,-c(Geography, Indicator, Population))
+hiv.data.2 <- 
+ select(hiv.data.2, -c(Geography, FIPS, ï..Indicator, Cases, Rate.per.100000))
+ 
+```
+
+```{r}
+# Merging hiv.data.1 (which has accurate FIPS code information) and hiv.data.2 (which has accurate population information)
+
+hiv.data.working <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
+
+# Making column names lowercase
+
+hiv.data.working <- clean_names(hiv.data.working)
+
+#Renaming columns
+
+ hiv.data.working <- hiv.data.working %>% 
+  setnames(old=c("rate_per_100000"), new=c("hiv_rate_per_100k")) %>%
+  setnames(old=c("cases"), new=c("hiv_cases")) 
+
+#Fixing column types
+
+hiv.data.working <- hiv.data.working %>%
+  mutate(hiv_cases=as.numeric(str_remove(hiv_cases,","))) %>%
+  mutate(hiv_rate_per_100k=as.numeric(hiv_rate_per_100k)) %>%
+  mutate(population=as.numeric(str_remove_all(population,",")))
+
+```
+
+```{r}
+
+# Storing an API keys as an object called key
+
+key <- "uO4EK6I"
+
+# Get pills per county per year
+
+arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
+  clean_names()
+
+```
+
+```{r}
+
+# Loading in csv with the 220 counties identified by CDC as being at highest risk for HIV outbreak from intravenous drug use
+
+top220.raw <- read.csv("data/Top220CountiesNew.csv") %>%
+  clean_names()
+
+```
+
+```{r}
+
+# Getting rid of uncessary columns
+
+top220.raw <- top220.raw %>%
+  select("state", "county")
+
+# Getting rid of excess years for the join
+
+hiv.data.working <- hiv.data.working %>%
+  filter(between(year, 2008, 2012))
+
+# Removing excess columns, fixing cases, removing spaces
+  
+  for.join <- hiv.data.working %>%
+  select("county", "state", "fips") %>%
+  distinct()
+  
+for.join <- mutate_all(for.join, .funs=toupper)
+
+top220.raw <- mutate_all(top220.raw, .funs=toupper)
+  
+str_replace_all(top220.raw, fixed(" "), "")
+
+```
+
+```{r}
+
+# Joining top220 to hiv.data.working to get FIPS codes
+
+top220.with.fips <- merge(top220.raw, for.join, by=c("county", "state")) 
+
+```
+
+```{r}
+
+# Joining top220.with.fips to ARCOS data
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  setnames(old=c("countyfips"), new=c("fips")) 
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+    filter(between(year, 2008, 2012))
+
+arcos.less <- arcos_county_pills_per_year %>%
+  select(year, dosage_unit, fips)
+
+top220.final <- top220.with.fips %>%
+  left_join(arcos.less, by="fips", "year") %>%
+  distinct()
+
+```
+
+```{r}
+
+# Adding population column to top220.final
+
+only.population <- hiv.data.working %>%
+  select("fips", "population", "year") %>%
+  distinct()
+
+top220.w.pop <- merge(top220.final, only.population, by=c("fips", "year")) 
+
+Top220 <- top220.w.pop
+
+```
+
+```{r}
+
+# Creating a column for pills per person
+
+Top220 <- Top220 %>%
+ mutate(pills_per_person=dosage_unit/population)
+
+
+```
+
+
+```{r}
+
+# Reading and cleaning overdose death data
+
+overdose.deaths <- read.delim("data/2006-2012.txt")
+
+overdose.deaths <- overdose.deaths %>% 
+setnames(old=c("County.Code"), new=c("fips")) %>%
+setnames(old=c("Age.Adjusted.Rate"), new=c("od_death_age_adjusted")) %>%
+filter(Deaths != "Suppressed")
+
+overdose.deaths <- overdose.deaths %>%
+  select("fips", "od_death_age_adjusted") %>%
+  mutate(fips=as.character(fips))
+
+```
+
+```{r}
+
+# Adding overdose death data to Top220
+
+Top220.od.2 <- Top220 %>%
+  left_join(overdose.deaths, by="fips")
+
+Top220 <- Top220.od.2
+
+```
+
+```{r}
+# Adding overdose death and population data to arcos_county_pills_per_year
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  filter(fips != "NA")
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  left_join(overdose.deaths, by="fips") %>%
+  distinct()
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  select("buyer_county", "buyer_state", "year.x", "dosage_unit", "fips", "od_death_age_adjusted")
+
+arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
+  setnames(old=c("year.x"), new=c("year"))
+
+arcos.pop <- merge(arcos_county_pills_per_year, only.population, by=c("fips", "year")) 
+
+
+nationwide_county_per_year <- arcos.pop
+
+```
+
+```{r}
+
+#Adding a pills per person column
+
+nationwide_county_per_year <- nationwide_county_per_year %>%
+ mutate(pills_per_person=dosage_unit/population)
+
+```
+
+```{r}
+# Joining HIV data with ARCOS data
+
+hiv_and_pills <- hiv.data.working %>%
+  inner_join(arcos_county_pills_per_year, by=c("fips","year"))
+
+hiv_and_pills <- hiv_and_pills %>%
+  subset(select = -c(buyer_county,buyer_state))
+
+```
+
+```{r}
+
+# Fixing column type for overdose death rates
+
+Top220 <- Top220 %>%
+  mutate(od_death_age_adjusted=as.character(od_death_age_adjusted))
+
+nationwide_county_per_year <- nationwide_county_per_year %>%
+  mutate(od_death_age_adjusted=as.numeric(od_death_age_adjusted))
+
+# NOTE: Just like before, changing the column type changed the values. I suspect that has thrown off the validity of that column. I'll leave it out of my analysis for now, but I'd like to come back to it.
+
+```
+
+```{r}
+
+# Giving all dataframes same column order
+
+hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "dosage_unit", "hiv_cases", "hiv_rate_per_100k", "population")]
+
+nationwide_county_per_year <- arcos.pop[c("fips", "buyer_county", "buyer_state", "year", "dosage_unit", "od_death_age_adjusted", "population")]
+
+Top220 <- Top220[c("fips", "county", "state", "year", "dosage_unit", "od_death_age_adjusted", "population")]
+
+```
+
+#PART 2: ANALYSIS
+
+```{r}
+
+# Q: What was the average pills per person rate for the top 220 counties?
+
+summary(Top220)
+
+# A: On average, these counties received 90 pills per person each year.
+
+```
+
+```{r}
+
+# Q: How does that compare to the nationwide average?
+
+summary(nationwide_county_per_year)
+
+# A: On average, these counties received 56 pills per person per year.
+
+```
+
+```{r}
+
+# Q: What are some counties in the CDC's top 220 that showed a high rate of pills per person?
+
+Top220 %>%
+  arrange(desc(pills_per_person))
+
+# Mingo and Logan counties, WV, Pike County, KY, and Walker County, AL.
+
+# Q: Judging by this data, which county would be good to visit for a story about the potential link between pill shipments and HIV diagnoses?
+
+# A: Smith County, TN had an HIV rate of above 200 in 2010 and 2011. It's listen on the top 220, and its HIV rate is significantly higher than the national average.
+
+
+```
+```{}
+

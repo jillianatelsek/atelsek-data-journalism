@@ -1,4 +1,4 @@
----
+
 title: "data_analysis_atelsek_1"
 output: html_document
 ---
@@ -6,44 +6,43 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+#PLAN
 
-```{r}
+new csv for 220 counties
+compare pills per person to nation; compare overdose deaths to nation
 
-#NOTE: There is a discrepancy between the county population figures given in the HIV data and the ARCOS data. Until I figure out why that is and how to resolve it, I'm going to use the column from the HIV dataset.
+in these 220 counties, rate of pills sent there per person was dramatically higher 
 
-```
-#LINKS: 
-
-Data downloaded from: https://gis.cdc.gov/grasp/nchhstpatlas/tables.html 
-
-CDC; Infectious Diseases, Opioids and Injection Drug Use: https://www.cdc.gov/pwid/opioid-use.html 
-
+#LINKS:
+Data downloaded from: https://gis.cdc.gov/grasp/nchhstpatlas/tables.html
+CDC; Infectious Diseases, Opioids and Injection Drug Use: https://www.cdc.gov/pwid/opioid-use.html
   https://www.ncbi.nlm.nih.gov/pubmed/27763996
-  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/ 
-  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/table/T2/?report=objectonly 
-  
-Post story: https://www.washingtonpost.com/national/unraveling-an-hiv-cluster/2019/11/03/66cf4526-f5af-11e9-8cf0-4cc99f74d127_story.html 
-
+  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/
+  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/table/T2/?report=objectonly
+Post story: https://www.washingtonpost.com/national/unraveling-an-hiv-cluster/2019/11/03/66cf4526-f5af-11e9-8cf0-4cc99f74d127_story.html
 CDC; Year 1 geographic priorities: https://www.cdc.gov/endhiv/data.html
 
 
+new csv for 220 counties
+compare pills per person to nation; compare overdose deaths to nation
+in these 220 counties, rate of pills sent there per person was dramatically higher
+
 ```{r}
-
 #Installing packages
+install.packages("data.table")
+install.packages("tidyverse")
+install.packages("janitor")
+install.packages("arcos")
+install.packages("tidycensus")
+install.packages("mapview")
+install.packages("ggthemes")
+install.packages("scales")
+install.packages("corrr")
 
-#install.packages("data.table")
-#install.packages("tidyverse")
-#install.packages("janitor")
-#install.packages("arcos")
-#install.packages("tidycensus")
-#install.packages("mapview")
-#install.packages("ggthemes")
-#install.packages("scales")
-#install.packages("corrr")
+```
 
-
+```{r}
 # Loading packages
-
 library(tidyverse)
 library(janitor)
 library(arcos)
@@ -53,270 +52,180 @@ library(ggthemes)
 library(scales)
 library(data.table)
 library(corrr)
-
 ```
 
 ```{r}
-
 # Q1: How can I fix the problem of correctly loading the population and FIPS columns?
-
 # A: Import the HIV data in two separate ways, then join them together.
-
 # Reading data
-
 hiv.data.1 <- read_csv("data/HIV_DATA.csv")
                      
 hiv.data.2 <- read.csv("data/HIV_DATA.csv")
-
 ```
 
 ```{r}
-
 # Removing all counties for which HIV data was suppressed
-
 hiv.data.1 <- hiv.data.1 %>%
   filter(Cases != "Data suppressed")
-
 hiv.data.2 <- hiv.data.2 %>%
   filter(Cases != "Data suppressed")
-
 ```
 
 ```{r}
-
 # Removing unecessary columns from each dataframe to simplify the join
-
 hiv.data.1 <- 
- select(hiv.data.1,-c(Geography, Indicator, Population))
-
+select(hiv.data.1,-c(Geography, Indicator, Population))
 hiv.data.2 <- 
  select(hiv.data.2, -c(Geography, FIPS, ï..Indicator, Cases, Rate.per.100000))
  
 ```
 
 ```{r}
-
 # Merging hiv.data.1 (which has accurate FIPS code information) and hiv.data.2 (which has accurate population information)
-
 hiv.data.working <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
-
 # SUCCESS 
-
 # Making column names lowercase
-
-hiv.data.working <- clean_names(hiv.data)
-
+hiv.data.working <- clean_names(hiv.data.working)
 ```
 
 ```{r}
-
- hiv.data.working <- hiv.data %>% 
+ hiv.data.working <- hiv.data.working %>% 
   setnames(old=c("rate_per_100000"), new=c("hiv_rate_per_100k")) %>%
   setnames(old=c("cases"), new=c("hiv_cases")) 
-
 ```
 
 ```{r}
-
-hiv.data.working <- hiv.data %>%
+hiv.data.working <- hiv.data.working %>%
   mutate(hiv_cases=as.numeric(str_remove(hiv_cases,","))) %>%
   mutate(hiv_rate_per_100k=as.numeric(hiv_rate_per_100k)) %>%
   mutate(population=as.numeric(str_remove_all(population,",")))
-
 ```
 
 ```{r}
-
 # Q2: How many counties had "data suppressed" as their value?
-
+hiv.data.raw <- read.csv("data/HIV_DATA.csv")
 hiv.data.raw %>%
   filter(Cases=="Data suppressed")
-
 # Answer: 7,620. That's a pretty significant number, and it might become a problem later on in the project.
-
 ```
 
 ```{r}
-
 # Q3: Which county had the highest rate of HIV diagnoses? When?
-
 hiv.data.working %>%
   arrange(desc(hiv_rate_per_100k))
-
 # A: Union County, FL, in 2012.
-
 ```
 
 ```{r}
-
 # Q4: Which county had the highest raw number of HIV cases? When? 
-
 hiv.data.working %>%
   arrange(desc(hiv_cases))
-
 # A: Los Angeles County, CA, in 2015.
-
 ```
 
 ``` {r}
-
 # Q5: How many counties have a rate of 0?
-
 hiv.data.working %>%
   filter(hiv_cases=="0")
-
 # A: 1,161.
-
 ```
 
 ```{r}
-
 # Time to pull down ARCOS data!
-
 # Storing one of our API keys as an object called key
-
 key <- "uO4EK6I"
-
 # Get pills per county per year
-
 arcos_county_pills_per_year <- summarized_county_annual(key = key) %>%
   clean_names()
-
-
 ```
 
 ``` {r}
-
 # The ARCOS database only covers the years 2006-2012. I'm going to remove the years that don't match up from the HIV data. 
-
-#hiv.data.working <- hiv.data.working %>%
-  #filter(between(year, 2008, 2012))
-
+hiv.data.working <- hiv.data.working %>%
+  filter(between(year, 2008, 2012))
 # The HIV database doesn't have 2006 or 2007. I'm going to remove those from the ARCOS database.
-
 #arcos_county_pills_per_year <- arcos_county_pills_per_year %>%
  # filter(year !=2006) 
   
 #arcos_county_pills_per_year <- arcos_county_pills_per_year %>% 
  # filter(year !=2007)
-
 ```
 
 ```{r}
-
 # Changing names in ARCOS dataframe to match HIV dataframe
-
 arcos_county_pills_per_year <- arcos_county_pills_per_year %>% 
   setnames(old=c("countyfips"), new=c("fips"))
-
 ```
 
 ```{r}
-
 # Joining HIV data with ARCOS data
-
 hiv_and_pills <- hiv.data.working %>%
   inner_join(arcos_county_pills_per_year, by=c("fips","year"))
-
 ```
 
 ```{r}
-
 # Q6: How many counties do we have data for once we do the join? 
  
 # A: 11,029. That's less than half of what we started with. Seems problematic. Maybe I will have to focus on one state? Or a handful of states?
-
 ```
 
 ```{r}
-
 # Q7: Now I want to figure out how to get rid of the unnecessary columns and arrange them nicely. How do I do that?
-
 # A: This is how.
-
 # Removing columns
-
 hiv_and_pills <- hiv_and_pills %>%
   subset(select = -c(buyer_county,buyer_state))
-
 # Cleaning up column names and rearranging their order. 
-
 hiv_and_pills %>%
   setnames(old=c("count"), new=c("shipments")) 
-
 hiv_and_pills <- hiv_and_pills[c("fips", "county", "state", "year", "shipments", "dosage_unit", "hiv_cases", "hiv_rate_per_100k", "population")]
-
 ```
 
 ```{r}
-
 # Q8: Which county received the most pills during the timeframe that's available after the join is complete (2008-12)? How many? What year was it?
-
 hiv_and_pills %>%
   arrange(desc(dosage_unit))
-
 # A: Los Angeles County in 2011. It received 232,616,611 pills that year.
-
 # Q9: Which county received the most pills during the entire timeframe that's available via the ARCOS database (2006-12?)
-
 arcos_county_pills_per_year %>%
   arrange(desc(dosage_unit))
-
 # A: Still LA County in 2011.
-
 ```
 
 ```{r}
-
 # Make a column for pills per person 
-
 hiv_and_pills <- hiv_and_pills %>%
  mutate(pills_per_person=dosage_unit/population)
-
 ```
 
 ```{r}
-
 # Q10: Which county had the most pills per person during the timeframe that's available after the join is complete (2008-12)? How many? What year was it?
-
 hiv_and_pills %>%
  arrange(desc(pills_per_person))
-
 # A: Leavenworth County, KS, received 473 pills per person in 2008. 
-
 # Q11: Which county received the most pills per person during the entire timeframe that's available via the ARCOS database (2006-12)?
-
 arcos_county_population_per_year <- county_population(key = key) %>%
   clean_names()
-
 arcos_county_pills_pop <- arcos_county_population_per_year %>%
   left_join(arcos_county_pills_per_year, by = c("countyfips"="fips", "year", "buyer_county","buyer_state"))
   
 arcos_county_pills_pop <- arcos_county_pills_pop %>%
   mutate(pills_per_person=dosage_unit/population)
-
 # A: Leavenworth County, KS, received 501 pills per person in 2007. 
-
 ```
 
 ```{r}
-
 # Q12: Which other counties had a lot of pills per person in the year 2008?
-
 hiv_and_pills %>%
   filter(year=="2008") %>%
   arrange(desc(pills_per_person))
-
 ```
 
 ```{r}
-
 # Q13: I'm going to zero in on the year 2012. What is the average HIV rate for counties that received more than 50 pills per person in that year?
-
   hiv_and_high_pills_2012 <- hiv_and_pills %>%
   filter(year=="2012") %>%
   filter(pills_per_person >= "50")
-
   summarize(hiv_and_high_pills_2012, Average = mean(hiv_rate_per_100k, na.rm = T))
   
 # A: 157.3. 
@@ -325,13 +234,10 @@ hiv_and_pills %>%
   
   hiv_and_all_pills_2012 <- hiv_and_pills %>%
   filter(year=="2012") 
-
   summarize(hiv_and_all_pills_2012, Average = mean(hiv_rate_per_100k, na.rm = T))
-
   
 # A: Not much. The average HIV rate is slightly higher.
   
-
 # Q15: What if I filter for counties with a low pills per person count?
   
   hiv_and_low_pills_2012 <- hiv_and_pills %>%
@@ -342,85 +248,60 @@ hiv_and_pills %>%
     
     
 # A: The HIV rate is even higher now! You love to see it.
-
 ```
 
 ```{r}
-
 # Q16: Is there any significant correlation between HIV rate and pills per person on a nationwide scale?  
-
   hiv_and_pills %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
-
 # A: Nope.
-
 ```
 
 ```{r}
-
 # Q17: Let's zero in on a specific year. Is there any correlation between HIV rate and pills per person on a nationwide scale in 2012?  
-
   hiv_and_pills %>%
   filter(year == "2012") %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
-
 # A: Slightly more, but still nope.
-
 ```
 
 ```{r}
-
 # Q18: I'm going to pick the states that appeared most in the table I did earlier showing the counties with the greatest number of pills per person in 2008. Any correlation there?
-
  hiv_and_pills %>%
   filter(state == c("WV", "KS", "SC", "VA", "TN")) %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
-
 # A: Not much.
-
 ```
 
 ```{r}
-
 # Q19: Is there any correlation between how many pills per person a county got in 2008 and their rate of HIV diagnoses in 2016?
-
 pills_2008 <- hiv_and_pills %>%
   filter(year=="2008") %>%
   select(pills_per_person, fips, state)
-
 hiv_2016 <- hiv.data.working %>%
   filter(year == "2016") %>%
   select(hiv_rate_per_100k, fips, state)
-
 pills_2008 %>%
   inner_join(hiv_2016, by=c("fips", "state")) %>%
   filter(state =="WV") %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
-
 # A: Alas, not really.
-
 ```
 
 ```{r}
-
 # Q20: Now I'm going to zero in on some specific states. What was up with West Virginia in 2012? Which county in West Virginia got the most pills per person in that year? I'm going to cross-reference this information with the at-risk counties identified by the CDC (explained below).
-
   hiv_and_pills %>%
   filter(state=="WV", year=="2012") %>%
   arrange(desc(pills_per_person))
-
 # A: Logan County. It got 205 pills per person.
-
 # Q21: What about Florida? It had a good amount of counties in the top 20 for HIV rate in 2012.
-
   hiv_and_pills %>%
   filter(state=="FL", year=="2012") %>%
   arrange(desc(pills_per_person))
-
   
 # A: Washington County, FL, got 92 pills per person in 2012.
   
@@ -429,7 +310,6 @@ pills_2008 %>%
   hiv_and_pills %>%
   filter(state=="KY", year=="2012") %>%
   arrange(desc(pills_per_person))
-
 # Q23:Tennessee?
   
   hiv_and_pills %>%
@@ -439,94 +319,75 @@ pills_2008 %>%
 ```
 
 ```{r}
-
 # Per the Post article Sean sent me, the CDC released a report in 2016 that identified 220 counties across the nation that were at risk for HIV because of intravenous drug use. The most at-risk county was Wolfe County, Kentucky. That county's HIV data wasn't available from the CDC. McDowell County, West Virginia, ranked second. I'm going to zero in on it.
-
 # Q24: Does anything obvious jump out when looking at McDowell's HIV rate and pill shipments from 2008-2012?
-
 mcdowell <- hiv_and_pills %>%
   filter(county=="Mcdowell County", state=="WV")
-
-
 # A: The number of pill shipments did jump pretty dramatically from 2009-12, as did the HIV rate per 100,000. However, with such a small sample size, it's hard to tell how valuable those numbers are.
-
-
 ```
 
 ```{r}
-
-# I am going to make a table for just the states that had counties identified as     at-risk. 
-
+# I am going to make a table for just the states that had counties identified as at-risk. 
   at_risk_counties <- hiv_and_pills %>%
-    filter(state ==c("AL","AK", "AZ", "CA", "CO", "GA", "IL", "IN", "KY", "MN", "MI", "MO", "MT", "NV", "NC", "OH", "OK", "PA", "TX", "UT", "VT", "WV", "KS", "SC", "VA", "TN"))
+    filter(state %in% c("AL","AK", "AZ", "CA", "CO", "GA", "IL", "IN", "KY", "MN", "MI", "MO", "MT", "NV", "NC", "OH", "OK", "PA", "TX", "UT", "VT", "WV", "KS", "SC", "VA", "TN"))
   
 # Q25: Any correlation there?
-
   at_risk_counties %>%
   select(hiv_rate_per_100k, pills_per_person) %>%
   correlate()
   
-# Q26: What if I compare pills in 2008 to opioid rate in 2012?
+  
+```
+  
+```{r}
+# Q26: What if I compare pills in 2008 to HIV rate in 2012?
   
   ar_pills_2008 <- at_risk_counties %>%
   filter(year=="2008") %>%
   select(pills_per_person, fips, state)
-
-  ar_hiv_2016 <- at_risk_counties %>%
-  filter(year == "2016") %>%
+  ar_hiv_2012 <- at_risk_counties %>%
+  filter(year == "2012") %>%
   select(hiv_rate_per_100k, fips, state)
-
-  ar_change <- ar_pills_2008 %>%
-  inner_join(ar_hiv_2016, by=c("fips", "state")) %>%
-  select(hiv_rate_per_100k, pills_per_person)
-  #correlate()
-  
+  ar_pills_2008 %>%
+  inner_join(ar_hiv_2012, by=c("fips", "state")) %>%
+  filter(state %in% c("KY", "TN")) %>%
+  select(hiv_rate_per_100k, pills_per_person) %>%
+  correlate()
 # A: Getting an error with the correlate function here that I can't seem to fix. Going to address it in class.
   
-
 # Q27: Kentucky and Tennessee had the most counties on the vulnerability list. Any correlation in just those two states?
   
   
- ar_change %>%
-  filter(state == c("KY", "TN")) %>%
-  select(hiv_rate_per_100k, pills_per_person) %>%
-  correlate()
-
+ 
+#  ar_pills_2008 %>%
+#  inner_join(ar_hiv_2016, by=c("fips", "state")) %>%
+#  filter(state==c("KY", "TN")) %>% 
+ # select(hiv_rate_per_100k, pills_per_person) %>%
+ # correlate()
+  
+hiv.data.working  
+  
  # A: Same as above.  
-
 ```
 
 ```{r}
-
 # Q28: Diverting a little: What does a county-by-county map of the HIV rate in 2012 look like? (This is mostly useful just to get a sense of what areas of the country I have data for, and what areas I don't.)
-
 census_key <- census_api_key("549950d36c22ff16455fe196bbbd01d63cfbe6cf")
-
 county_geodata_shifted <- get_acs(geography = "county",
               variables = "B01001_001", geometry = TRUE, shift_geo = TRUE)
-
 hiv.data.2012 <- hiv.data.working %>%
   filter(year=="2012", hiv_rate_per_100k >= 1)
-
 geo_hiv_county_2012 <- county_geodata_shifted %>%
  inner_join(hiv.data.2012, by=c("GEOID" = "fips"))
-
 mapview(geo_hiv_county_2012, zcol = "hiv_rate_per_100k", legend = TRUE, at = seq(2000, 1000, 30))
-
 ```
 
 ```{r}
-
 # Q29: Back to the HIV-pills correlation. What other factors did the CDC identify in its assessment of at-risk counties?
-
 # A: The demographic information of each county was key. They analyzed race, gender, and age makeup, as well as statistics like how far people live on average from a hospital. For my final analysis, I'm going to work on adding some of those factors that the CDC determined to be most important in driving HIV rates into my analysis.
-
 ```
 
 ```{r}
-
 # Q30: Does the CDC keep any kind of data on the causes attributed to HIV diagnoses? 
-
 # A: Yes. That data shows a pretty dramatic increase in HIV diagnoses attributed to intravenous drug use among white Americans. I'm curious to look into how they gather that data. It could inform some more analysis.
-
 ```
