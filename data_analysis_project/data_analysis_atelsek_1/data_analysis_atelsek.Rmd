@@ -12,6 +12,20 @@ knitr::opts_chunk$set(echo = TRUE)
 #NOTE: There is a discrepancy between the county population figures given in the HIV data and the ARCOS data. Until I figure out why that is and how to resolve it, I'm going to use the column from the HIV dataset.
 
 ```
+#LINKS: 
+
+Data downloaded from: https://gis.cdc.gov/grasp/nchhstpatlas/tables.html 
+
+CDC; Infectious Diseases, Opioids and Injection Drug Use: https://www.cdc.gov/pwid/opioid-use.html 
+
+  https://www.ncbi.nlm.nih.gov/pubmed/27763996
+  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/ 
+  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5479631/table/T2/?report=objectonly 
+  
+Post story: https://www.washingtonpost.com/national/unraveling-an-hiv-cluster/2019/11/03/66cf4526-f5af-11e9-8cf0-4cc99f74d127_story.html 
+
+CDC; Year 1 geographic priorities: https://www.cdc.gov/endhiv/data.html
+
 
 ```{r}
 
@@ -84,19 +98,19 @@ hiv.data.2 <-
 
 # Merging hiv.data.1 (which has accurate FIPS code information) and hiv.data.2 (which has accurate population information)
 
-hiv.data <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
+hiv.data.working <- merge(hiv.data.1, hiv.data.2, by=c("Year","County", "State")) 
 
 # SUCCESS 
 
 # Making column names lowercase
 
-hiv.data <- clean_names(hiv.data)
+hiv.data.working <- clean_names(hiv.data)
 
 ```
 
 ```{r}
 
- hiv.data. <- hiv.data %>% 
+ hiv.data.working <- hiv.data %>% 
   setnames(old=c("rate_per_100000"), new=c("hiv_rate_per_100k")) %>%
   setnames(old=c("cases"), new=c("hiv_cases")) 
 
@@ -114,8 +128,6 @@ hiv.data.working <- hiv.data %>%
 ```{r}
 
 # Q2: How many counties had "data suppressed" as their value?
-
-hiv.data.raw <- read.csv("data/HIV_DATA.csv")
 
 hiv.data.raw %>%
   filter(Cases=="Data suppressed")
